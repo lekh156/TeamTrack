@@ -1,4 +1,4 @@
-# app.py - Final Employee Dashboard (uses your CSV columns exactly)
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,13 +8,10 @@ import os
 
 st.set_page_config(layout="wide", page_title="Employee Dashboard")
 
-# ---------- CONFIG ----------
 CSV_PATH = r"C:\Users\lek\OneDrive\Desktop\EmployeeDashboard\employee_data.csv"
 ADMIN_USER = "admin"
 ADMIN_PASS = "1234"
 MONTHLY_LEAVE_QUOTA = 5
-
-# ---------- LOAD CSV ----------
 @st.cache_data
 def load_data(path):
     df_local = pd.read_csv(path)
@@ -28,26 +25,20 @@ except Exception as e:
     st.error(f"Cannot read CSV at `{CSV_PATH}`. Error: {e}")
     st.stop()
 
-# ---------- Validate & Prepare Columns ----------
-# Expected columns (from you): employee_id, Days_Present, Attendance_Percentage, Avg_Task_Rating, Insight
-# Ensure employee_id exists
 if "employee_id" not in df.columns:
     st.error("CSV must contain column: 'employee_id'. Please check your CSV header.")
     st.stop()
 
-# Ensure sensible types/columns exist for used leaves (we'll create if missing)
 if "Used_Leaves" not in df.columns:
     df["Used_Leaves"] = 0
 
-# Ensure Attendance_Percentage and Avg_Task_Rating numeric
 df["Attendance_Percentage"] = pd.to_numeric(df["Attendance_Percentage"], errors="coerce").fillna(0)
 df["Avg_Task_Rating"] = pd.to_numeric(df["Avg_Task_Rating"], errors="coerce").fillna(0)
 df["employee_id"] = df["employee_id"].astype(str).str.strip()
 
-# Temporary password (last 2 digits of employee_id) - not saved to CSV
+
 df["_password"] = df["employee_id"].str[-2:]
 
-# ---------- SESSION STATE INIT ----------
 if "credentials" not in st.session_state:
     creds = {}
     for uid in df["employee_id"].tolist():
@@ -60,7 +51,6 @@ if "user" not in st.session_state:
 if "role" not in st.session_state:
     st.session_state.role = None
 
-# leave balances (remaining days); initialize from CSV Used_Leaves if present
 if "leave_balance" not in st.session_state:
     lb = {}
     for uid in df["employee_id"].tolist():
@@ -68,22 +58,19 @@ if "leave_balance" not in st.session_state:
         lb[uid] = max(0, MONTHLY_LEAVE_QUOTA - used)
     st.session_state.leave_balance = lb
 
-# per-employee leave history (in-memory)
 if "leave_history" not in st.session_state:
     hist = {}
     for uid in df["employee_id"].tolist():
         hist[uid] = pd.DataFrame(columns=["Date", "Days", "Reason", "Status"])
     st.session_state.leave_history = hist
 
-# central leave requests table
 if "leave_requests" not in st.session_state:
     st.session_state.leave_requests = pd.DataFrame(columns=["RequestID", "EmployeeID", "Date", "Days", "Reason", "Status"])
 
-# ---------- HELPER FUNCTIONS ----------
 def save_used_leaves_to_csv():
     """Write back Used_Leaves to CSV so approvals persist across restarts."""
     try:
-        # compute used leaves from session_state.leave_balance
+ 
         for uid, remaining in st.session_state.leave_balance.items():
             used = MONTHLY_LEAVE_QUOTA - remaining
             df.loc[df["employee_id"] == uid, "Used_Leaves"] = int(used)
@@ -96,7 +83,7 @@ def next_request_id():
         return 1
     return int(st.session_state.leave_requests["RequestID"].max()) + 1
 
-# ---------- SIDEBAR LOGIN ----------
+
 st.sidebar.title("Employee Dashboard")
 if st.session_state.user is None:
     with st.sidebar.form("login_form"):
@@ -122,7 +109,6 @@ else:
         st.session_state.role = None
         st.rerun()
 
-# ---------- MAIN: Role-based Pages ----------
 current_user = st.session_state.user
 current_role = st.session_state.role
 
@@ -135,7 +121,6 @@ if current_role == "employee":
         st.stop()
     emp = emp_rows.iloc[0]
 
-    # Display basic info
     name_display = emp.get("Name", emp.get("name", uid))
     st.subheader(f"{name_display}  (ID: {uid})")
     st.write(f"📅 Days Present: {int(emp.get('Days_Present',0))}")
@@ -143,7 +128,7 @@ if current_role == "employee":
     st.write(f"⭐ Avg Task Rating: {float(emp.get('Avg_Task_Rating',0)):.1f}")
     st.write(f"ℹ Insight: {emp.get('Insight','-')}")
 
-    # Charts
+   
     c1, c2 = st.columns(2)
     with c1:
         fig, ax = plt.subplots()
@@ -158,7 +143,6 @@ if current_role == "employee":
         ax2.set_ylabel("Rating")
         st.pyplot(fig2)
 
-    # Leave Management
     st.markdown("---")
     st.subheader("Leave Management")
     remaining = st.session_state.leave_balance.get(uid, MONTHLY_LEAVE_QUOTA)
